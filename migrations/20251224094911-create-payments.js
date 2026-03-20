@@ -36,6 +36,9 @@ module.exports = {
       created_at: Sequelize.DATE,
       updated_at: Sequelize.DATE,
     });
+    
+    await queryInterface.addIndex("payments", ["order_id"]);
+    await queryInterface.addIndex("payments", ["status"]);
   },
 
   async down(queryInterface) {

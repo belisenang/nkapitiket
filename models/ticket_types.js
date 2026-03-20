@@ -7,6 +7,7 @@ module.exports = (sequelize, DataTypes) => {
         defaultValue: DataTypes.UUIDV4,
         primaryKey: true,
       },
+      ticket_group_id: DataTypes.UUID,
       event_id: DataTypes.UUID,
       name: DataTypes.STRING,
       deskripsi: DataTypes.TEXT,
@@ -17,13 +18,13 @@ module.exports = (sequelize, DataTypes) => {
       reserved_stock: DataTypes.BIGINT,
       admin_fee_included: DataTypes.BOOLEAN,
       tax_included: DataTypes.BOOLEAN,
-      status: DataTypes.ENUM("draft", "available", "closed"),
+      status: DataTypes.ENUM("scheduled", "on_sale", "ended"),
       ticket_usage_type: DataTypes.ENUM("single_entry", "daily_entry", "multi_entry"),
       deliver_ticket: DataTypes.DATE,
-      date_start: DataTypes.DATE,
-      date_end: DataTypes.DATE,
-      time_start: DataTypes.TIME,
-      time_end: DataTypes.TIME,
+      sale_start: DataTypes.DATE,
+      sale_end: DataTypes.DATE,
+      valid_start: DataTypes.DATE,
+      valid_end: DataTypes.DATE,
     },
     {
       tableName: "ticket_types",
@@ -40,6 +41,10 @@ module.exports = (sequelize, DataTypes) => {
     TicketType.hasMany(models.Ticket, {
       foreignKey: "ticket_type_id",
       as: "tickets",
+    });
+    TicketType.belongsTo(models.TicketGroup, {
+      foreignKey: "ticket_group_id",
+      as: "group",
     });
   };
 

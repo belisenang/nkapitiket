@@ -1,19 +1,36 @@
 const Joi = require("joi");
 
 const ticketSchema = Joi.object({
+  ticket_group_id: Joi.string().uuid().allow(null),
   name: Joi.string().required(),
+
   deskripsi: Joi.string().allow("", null),
+
   price: Joi.number().positive().required(),
+
   total_stock: Joi.number().integer().min(1).required(),
+
   max_per_order: Joi.number().integer().min(1).required(),
-  status: Joi.string().valid("draft", "available", "closed").default("draft"),
+
+  status: Joi.string()
+    .valid("scheduled", "on_sale", "ended")
+    .default("scheduled"),
+
   admin_fee_included: Joi.boolean().default(true),
+
   tax_included: Joi.boolean().default(false),
-  deliver_ticket: Joi.date().required(),
-  date_start: Joi.date().required(),
-  date_end: Joi.date().required(),
-  time_start: Joi.string().required(),
-  time_end: Joi.string().required(),
+
+  deliver_ticket: Joi.date().iso().required(),
+
+  sale_start: Joi.date().iso().required(),
+  sale_end: Joi.date().iso().required(),
+
+  valid_start: Joi.date().iso().allow(null),
+  valid_end: Joi.date().iso().allow(null),
+
+  ticket_usage_type: Joi.string()
+    .valid("single_entry", "daily_entry", "multi_entry")
+    .default("single_entry"),
 });
 
 module.exports = {

@@ -94,6 +94,16 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.UUID,
         allowNull: true,
       },
+
+      valid_start: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+      
+      valid_end: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
     },
     {
       tableName: "tickets",

@@ -94,6 +94,14 @@ module.exports = {
         type: Sequelize.UUID,
         allowNull: true,
       },
+      valid_start: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+      valid_end: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
 
       created_at: {
         type: Sequelize.DATE,

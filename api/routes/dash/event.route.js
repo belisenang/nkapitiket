@@ -11,8 +11,8 @@ const { autoFilterByCreator } = require("../../middlewares/autoFilterCreator.mid
 
 router.get("/", creatorGuard("PROMOTOR_OWNER", "PROMOTOR_EVENT_ADMIN"), autoFilterByCreator(), controller.index);
 router.get("/pagination", creatorGuard("PROMOTOR_OWNER", "PROMOTOR_EVENT_ADMIN"), autoFilterByCreator(), controller.getPagination);
-router.get("/:eventId", creatorGuard("PROMOTOR_OWNER", "PROMOTOR_EVENT_ADMIN"), eventAccessGuard(), controller.show);
 router.get("/slug/:slug", controller.slug);
+router.get("/:eventId", creatorGuard("PROMOTOR_OWNER", "PROMOTOR_EVENT_ADMIN"), eventAccessGuard(), controller.show);
 
 router.post(
     "/",

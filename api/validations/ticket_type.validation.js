@@ -3,35 +3,73 @@ const Joi = require("joi");
 module.exports = {
   bulkCreate: Joi.array().items(
     Joi.object({
+      ticket_group_id: Joi.string().uuid().allow(null),
       name: Joi.string().required(),
-      deskripsi: Joi.string().allow(null, ""),
-      price: Joi.number().required(),
-      total_stock: Joi.number().min(1).required(),
-      max_per_order: Joi.number().min(1).required(),
-      status: Joi.string().valid("draft", "available", "closed").default("draft"),
+      deskripsi: Joi.string().allow("", null),
+      price: Joi.number().positive().required(),
+      total_stock: Joi.number().integer().min(1).required(),
+      max_per_order: Joi.number().integer().min(1).required(),
+      status: Joi.string()
+        .valid("scheduled", "on_sale", "ended")
+        .default("scheduled"),
       admin_fee_included: Joi.boolean().default(true),
       tax_included: Joi.boolean().default(false),
       deliver_ticket: Joi.date().required(),
-      date_start: Joi.date().required(),
-      date_end: Joi.date().required(),
-      time_start: Joi.string().required(),
-      time_end: Joi.string().required(),
+      sale_start: Joi.date().required(),
+      sale_end: Joi.date().required(),
+      valid_start: Joi.date().allow(null),
+      valid_end: Joi.date().allow(null),
+      ticket_usage_type: Joi.string()
+        .valid("single_entry", "daily_entry", "multi_entry")
+        .default("single_entry"),
     })
   ),
 
   update: Joi.object({
-    name: Joi.string().optional(),
-    deskripsi: Joi.string().allow(null, "").optional(),
-    price: Joi.number().optional(),
-    total_stock: Joi.number().min(1).optional(),
-    max_per_order: Joi.number().min(1).optional(),
-    status: Joi.string().valid("draft", "available", "closed").optional(),
-    admin_fee_included: Joi.boolean().optional(),
-    tax_included: Joi.boolean().optional(),
-    deliver_ticket: Joi.date().optional(),
-    date_start: Joi.date().optional(),
-    date_end: Joi.date().optional(),
-    time_start: Joi.string().optional(),
-    time_end: Joi.string().optional(),
-  })
+    ticket_group_id: Joi.string().uuid().allow(null),
+    name: Joi.string().required(),
+    deskripsi: Joi.string().allow("", null),
+    price: Joi.number().positive().required(),
+    total_stock: Joi.number().integer().min(1).required(),
+    max_per_order: Joi.number().integer().min(1).required(),
+    status: Joi.string()
+      .valid("scheduled", "on_sale", "ended")
+      .default("scheduled"),
+    admin_fee_included: Joi.boolean().default(true),
+    tax_included: Joi.boolean().default(false),
+    deliver_ticket: Joi.date().required(),
+    sale_start: Joi.date().required(),
+    sale_end: Joi.date().required(),
+    valid_start: Joi.date().allow(null),
+    valid_end: Joi.date().allow(null),
+    ticket_usage_type: Joi.string()
+      .valid("single_entry", "daily_entry", "multi_entry")
+      .default("single_entry"),
+  }),
+
+  createBundle: Joi.array().items(
+    Joi.object({
+
+      name: Joi.string().max(150).required(),
+
+      description: Joi.string().allow("", null),
+
+      price: Joi.number().positive().required(),
+
+      max_per_order: Joi.number().integer().min(1).default(10),
+
+      status: Joi.string()
+        .valid("draft", "available", "closed")
+        .default("draft"),
+
+      items: Joi.array().items(
+        Joi.object({
+          ticket_type_id: Joi.string().uuid().required(),
+          quantity: Joi.number().integer().min(1).required()
+        })
+      ).min(1).required()
+
+    })
+  )
+
 };

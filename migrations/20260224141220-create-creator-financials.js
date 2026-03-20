@@ -22,6 +22,7 @@ module.exports = {
       created_at: Sequelize.DATE
 
     });
+    await queryInterface.addIndex("creator_financials", ["creator_id"]);
   },
   async down(queryInterface, Sequelize) {
     await queryInterface.dropTable('creator_financials');

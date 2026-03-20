@@ -38,6 +38,8 @@ module.exports = {
       created_at: Sequelize.DATE,
       updated_at: Sequelize.DATE,
     });
+    await queryInterface.addIndex("order_items", ["order_id"]);
+    await queryInterface.addIndex("order_items", ["ticket_type_id"]);
   },
 
   async down(queryInterface) {

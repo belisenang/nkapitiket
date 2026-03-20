@@ -2,7 +2,89 @@ const { Event, Creator, Kategori, User, sequelize, TicketType, GuestStars, Spons
 const slugify = require("../../utils/slugify");
 const deleteImage = require("../../utils/deleteImage");
 const { Op } = require("sequelize");
+const { toWIB } = require("../../utils/wib");
 module.exports = {
+  async createAll(data) {
+    const transaction = await sequelize.transaction();
+
+    try {
+      data.slug = slugify(data.name);
+
+      const event = await Event.create(data, { transaction });
+      if (data.ticket_types && Array.isArray(data.ticket_types) && data.ticket_types.length > 0) {
+
+        const tickets = data.ticket_types.map((t) => {
+
+          const saleStart = t.sale_start ? new Date(t.sale_start) : null;
+          const saleEnd = t.sale_end ? new Date(t.sale_end) : null;
+          const deliver_ticket = t.deliver_ticket ? new Date(t.deliver_ticket) : null;
+          const valid_start = t.valid_start ? new Date(t.valid_start) : null;
+          const valid_end = t.valid_end ? new Date(t.valid_end) : null;
+
+          return {
+            event_id: event.id,
+            name: t.name,
+            deskripsi: t.deskripsi,
+            price: t.price,
+
+            total_stock: t.total_stock,
+            max_per_order: t.max_per_order,
+
+            reserved_stock: 0,
+            ticket_sold: 0,
+
+            admin_fee_included: t.admin_fee_included,
+            tax_included: t.tax_included,
+
+            deliver_ticket: deliver_ticket,
+
+            sale_start: saleStart,
+            sale_end: saleEnd,
+
+            valid_start: valid_start,
+            valid_end: valid_end,
+
+            ticket_usage_type: t.ticket_usage_type || "single_entry",
+
+            status: t.status || "scheduled",
+          };
+
+        });
+
+        await TicketType.bulkCreate(tickets, { transaction });
+
+        const lowestPrice = Math.min(
+          ...tickets.map(t => Number(t.price))
+        );
+
+        await event.update(
+          { lowest_price: lowestPrice },
+          { transaction }
+        );
+      }
+
+      await transaction.commit();
+      return event;
+
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+  },
+
+  async update(eventId, data) {
+    const event = await Event.findByPk(eventId);
+    if (!event) throw new Error("Event not found");
+
+    if (data.name) data.slug = slugify(data.name);
+
+    if (data.image && event.image) deleteImage(event.image);
+    if (data.layout_venue && event.layout_venue) deleteImage(event.layout_venue);
+
+    await event.update(data);
+    return event;
+  },
+
   async getOne(eventId) {
     const event = await Event.findByPk(eventId, {
       include: [
@@ -96,54 +178,6 @@ module.exports = {
   async create(data) {
     data.slug = slugify(data.name);
     return await Event.create(data);
-  },
-
-  async createAll(data) {
-    const transaction = await sequelize.transaction();
-
-    try {
-      data.slug = slugify(data.name);
-
-      const event = await Event.create(data, { transaction });
-      if (data.ticket_types && Array.isArray(data.ticket_types) && data.ticket_types.length > 0) {
-
-        const tickets = data.ticket_types.map(t => ({
-          ...t,
-          event_id: event.id
-        }));
-
-        await TicketType.bulkCreate(tickets, { transaction });
-
-        const lowestPrice = Math.min(
-          ...tickets.map(t => Number(t.price))
-        );
-
-        await event.update(
-          { lowest_price: lowestPrice },
-          { transaction }
-        );
-      }
-
-      await transaction.commit();
-      return event;
-
-    } catch (err) {
-      await transaction.rollback();
-      throw err;
-    }
-  },
-
-  async update(eventId, data) {
-    const event = await Event.findByPk(eventId);
-    if (!event) throw new Error("Event not found");
-
-    if (data.name) data.slug = slugify(data.name);
-
-    if (data.image && event.image) deleteImage(event.image);
-    if (data.layout_venue && event.layout_venue) deleteImage(event.layout_venue);
-
-    await event.update(data);
-    return event;
   },
 
   async remove(eventId) {
