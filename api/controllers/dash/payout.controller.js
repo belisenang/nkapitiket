@@ -5,12 +5,14 @@ const bcrypt = require("../../../utils/bcrypt");
 module.exports = {
 
     async dashboard(req, res) {
+        
         try {
             const creator_id = req.user.creator_id;
             const { range = 30 } = req.query;
             const data = await service.getDashboard(creator_id, range);
 
             res.json({ success: true, data });
+            
         } catch (err) {
             res.status(400).json({ success: false, message: err.message });
         }

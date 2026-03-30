@@ -16,7 +16,7 @@ module.exports = (sequelize, DataTypes) => {
 
       gateway_fee_amount: DataTypes.DECIMAL(15, 2),
 
-      status: DataTypes.STRING,
+      status: DataTypes.ENUM("pending", "paid", "failed"),
       payment_method: DataTypes.STRING,
 
       qris_payload: DataTypes.TEXT,

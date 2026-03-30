@@ -7,4 +7,4 @@ router.get("/export/pdf", controller.exportPDF);
 router.get("/pagination", controller.pagination);
 router.get("/:id", controller.detail);
 router.post("/:id/resend", controller.resendTicket);
-module.exports = router;
+module.exports = router; 

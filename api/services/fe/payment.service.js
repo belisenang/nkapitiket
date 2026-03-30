@@ -90,7 +90,8 @@ module.exports = {
             as: "ticket_bundles",
             attributes: [
               "id",
-              "name"
+              "name",
+              "event_id"
             ]
           }
 

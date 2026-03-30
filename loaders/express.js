@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const hpp = require("hpp");
+const compression = require("compression")
 const routes = require("../api/routes");
 const logger = require("../config/logger");
 const errorHandler = require("../api/middlewares/error.middleware");
@@ -37,26 +38,7 @@ module.exports = () => {
     })
   );
 
-  // app.use(
-  //   cors({
-  //     origin: (origin, callback) => {
-  //       if (!origin || allowedOrigins === "*" || allowedOrigins.includes(origin)) {
-  //         callback(null, true);
-  //       } else {
-  //         callback(new Error("CORS not allowed"));
-  //       }
-  //     },
-  //     credentials: true,
-  //     allowedHeaders: [
-  //       "Content-Type",
-  //       "Authorization",
-  //       "x-api-key",
-  //     ],
-  //     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  //   })
-  // );
-
-
+  app.use(compression())
   app.use(sanitize);
   app.use(hpp());
 
@@ -97,6 +79,18 @@ module.exports = () => {
     },
     express.static(path.join(__dirname, "../public/uploads"))
   );
+
+  app.get("/health", (req, res) => {
+
+    res.status(200).json({
+
+      status: "ok",
+      uptime: process.uptime(),
+      timestamp: new Date()
+
+    })
+
+  })
   // Load Swagger docs
   // swaggerLoader(app);
 

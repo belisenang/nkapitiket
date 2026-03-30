@@ -121,6 +121,23 @@ module.exports = {
 
         }
 
+    },
+
+    // dashboard
+    async dashboard(req, res) {
+
+        try {
+            const result = await service.dashboard(req.customer.id);
+            res.json({
+                message: "success",
+                data: result
+            });
+        } catch (err) {
+            res.status(500).json({
+                message: "Failed retrieve dashboard data",
+                error: err.message
+            });
+        }
     }
 
 

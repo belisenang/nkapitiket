@@ -13,7 +13,7 @@ const { toWIB } = require("../../utils/wib");
 function normalizeAmount(raw) {
     if (!raw) return 0;
     return Number(String(raw).replace(/[^0-9]/g, ""));
-}
+} 
 
 module.exports = {
 

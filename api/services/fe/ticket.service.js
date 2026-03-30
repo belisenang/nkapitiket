@@ -12,7 +12,7 @@ const {
 const crypto = require("crypto");
 const { generateSignature } = require("../../utils/qrSignature");
 
-module.exports = {
+module.exports = { 
 
   async generateTickets(orderId, transaction) {
 

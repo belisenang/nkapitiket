@@ -723,6 +723,38 @@ module.exports = {
         };
 
         return searching;
+    },
+
+    // dashboard
+    async dashboard(customerId) {
+        const events = await Event.findAll({
+            where: { creator_id: customerId },
+            include: [
+                {
+                    model: TicketType,
+                    as: "ticket_types",
+                    attributes: ["id", "name", "price", "ticket_sold"]
+                }
+            ],
+            order: [["created_at", "DESC"]]
+        });
+        const data = events.map((event) => ({
+            id: event.id,
+            name: event.name,
+            slug: event.slug,
+            image: event.image ? process.env.MEDIA_URL_FRONTEND + event.image : null,
+            dateStart: event.date_start,
+            timeStart: event.time_start,
+            dateEnd: event.date_end,
+            timeEnd: event.time_end,
+            status: event.status,
+            location: event.location,
+            province: event.province,
+            city: event.district,
+            lowestPrice: event.lowest_price,
+            totalSold: event.ticket_types.reduce((sum, t) => sum + (t.ticket_sold || 0), 0)
+        }));
+        return data;
     }
 };
 

@@ -1,13 +1,18 @@
 const {
+    sequelize,
     Order,
     OrderItem,
     Payment,
     TicketType,
     Event,
-    Ticket
+    Ticket,
+    TicketBundles,
+    TicketBundleItem
 } = require("../../../models");
 
 const { Op } = require("sequelize");
+
+const { QueryTypes } = require("sequelize");
 const { maskEmail } = require("../../../utils/maskEmail");
 const { maskPhone } = require("../../../utils/maskPhone");
 const { toWIB } = require("../../utils/wib");
@@ -29,6 +34,7 @@ function buildDateRange(start_date, end_date) {
 
 module.exports = {
 
+
     async getPagination({
         page,
         perPage,
@@ -44,274 +50,370 @@ module.exports = {
         const limit = Number(perPage) || 10;
         const offset = (Number(page) - 1) * limit;
 
-        const where = {
+        const replacements = {
+
             creator_id,
+            limit,
+            offset,
 
-            ...(status && status !== "ALL"
-                ? { status: status.toLowerCase() }
-                : {}),
+            search:
+                search
+                    ? `%${search}%`
+                    : null,
 
-            ...buildDateRange(start_date, end_date),
+            status:
+                status && status !== "ALL"
+                    ? status.toLowerCase()
+                    : null,
+
+            payment_method:
+                payment_method && payment_method !== "ALL"
+                    ? payment_method
+                    : null,
+
+            event_id:
+                event_id && event_id !== "ALL"
+                    ? event_id
+                    : null,
+
+            start_date:
+                start_date || null,
+
+            end_date:
+                end_date || null
+
         };
 
-        if (search) {
-            where[Op.or] = [
-                { code_order: { [Op.like]: `%${search}%` } },
-                { customer_name: { [Op.like]: `%${search}%` } },
-                { customer_email: { [Op.like]: `%${search}%` } },
-                { customer_phone: { [Op.like]: `%${search}%` } },
-            ];
-        }
 
-        const include = [
+        const baseWhere = `
 
-            // ITEMS
-            {
-                model: OrderItem,
-                as: "items",
-                required: false,
+    o.creator_id = :creator_id
 
-                include: [
+    ${status && status !== "ALL"
+                ? "AND o.status = :status"
+                : ""}
 
-                    {
-                        model: TicketType,
-                        as: "ticket_type",
-                        required: false,
+    ${start_date && end_date
+                ? "AND o.created_at BETWEEN CONCAT(:start_date,' 00:00:00') AND CONCAT(:end_date,' 23:59:59')"
+                : ""}
 
-                        include: [
+  `;
 
-                            {
-                                model: Event,
-                                as: "event",
 
-                                required:
-                                    !!event_id &&
-                                    event_id !== "ALL",
+        const searchWhere = search
+            ? `
 
-                                where:
-                                    event_id &&
-                                        event_id !== "ALL"
-                                        ? { id: event_id }
-                                        : undefined
-                            }
+      AND (
 
-                        ]
-                    },
+        o.code_order LIKE :search
+        OR o.customer_name LIKE :search
+        OR o.customer_email LIKE :search
+        OR o.customer_phone LIKE :search
 
-                    {
-                        model: Ticket,
-                        as: "tickets",
-                        required: false,
+        OR e.name LIKE :search
+        OR tt.name LIKE :search
+        OR tb.name LIKE :search
+        OR t.ticket_code LIKE :search
 
-                        attributes: [
-                            "ticket_code",
-                            "issued_at",
-                            "sent_at"
-                        ]
-                    }
+      )
 
-                ]
-            },
+    `
+            : "";
 
-            // PAYMENT
-            {
-                model: Payment,
-                as: "payments",
 
-                required:
-                    !!payment_method &&
-                    payment_method !== "ALL",
+        const eventFilter = event_id
+            ? "AND x.event_id = :event_id"
+            : "";
 
-                where:
-                    payment_method &&
-                        payment_method !== "ALL"
-                        ? { payment_method }
-                        : undefined,
 
-                attributes: [
-                    "payment_method",
-                    "status",
-                    "amount",
-                    "paid_at"
-                ]
-            }
+        const sql = `
 
-        ];
+SELECT
+  o.id,
+  o.code_order,
+  o.customer_name,
+  o.customer_email,
+  o.customer_phone,
+  o.status,
+  o.created_at,
 
-        const { rows, count } =
-            await Order.findAndCountAll({
+  o.buyer_pay_total,
+  o.organizer_net_total,
 
-                where,
+  p.payment_method,
+  p.status as payment_status,
+  p.amount,
+  p.paid_at,
 
-                include,
+  GROUP_CONCAT(DISTINCT e.name) as event_names,
 
-                distinct: true,
+  SUM(oi.quantity) as total_ticket_qty
 
-                order: [
-                    ["created_at", "DESC"]
-                ],
+FROM orders o
 
-                limit,
+JOIN (
 
-                offset
-            });
+  SELECT
+    oi.order_id,
+    tt.event_id
+  FROM order_items oi
+  JOIN ticket_types tt
+    ON tt.id = oi.ticket_type_id
 
-        // =====================
-        // SUMMARY
-        // =====================
+  UNION
 
-        const summaryRows =
-            await Order.findAll({
+  SELECT
+    oi.order_id,
+    tb.event_id
+  FROM order_items oi
+  JOIN ticket_bundles tb
+    ON tb.id = oi.bundle_id
 
-                where,
+) x
+ON x.order_id = o.id
 
-                include,
+LEFT JOIN order_items oi
+  ON oi.order_id = o.id
 
-                distinct: true
-            });
+LEFT JOIN ticket_types tt
+  ON tt.id = oi.ticket_type_id
 
-        let totalTicketQty = 0;
-        let totalRevenue = 0;
-        let totalOrganizerNet = 0;
+LEFT JOIN ticket_bundles tb
+  ON tb.id = oi.bundle_id
 
-        summaryRows.forEach(order => {
+LEFT JOIN events e
+  ON e.id = COALESCE(tt.event_id, tb.event_id)
 
-            totalRevenue +=
-                Number(order.buyer_pay_total || 0);
+LEFT JOIN tickets t
+  ON t.order_item_id = oi.id
 
-            totalOrganizerNet +=
-                Number(order.organizer_net_total || 0);
+LEFT JOIN payments p
+  ON p.order_id = o.id
 
-            totalTicketQty +=
-                order.items.reduce(
+WHERE
 
-                    (sum, item) =>
-                        sum + Number(item.quantity || 0),
+  ${baseWhere}
 
-                    0
-                );
+  ${eventFilter}
 
-        });
+  ${searchWhere}
 
-        // =====================
-        // FORMAT RESPONSE
-        // =====================
+GROUP BY o.id
 
-        const formattedRows =
-            rows.map(order => {
+ORDER BY o.created_at DESC
 
-                const pay =
-                    order.payments?.[0] || null;
+LIMIT :limit
+OFFSET :offset
 
-                // ambil semua event
-                const eventNames =
-                    order.items
-                        ?.map(i =>
-                            i.ticket_type?.event?.name
-                        )
-                        .filter(Boolean);
+  `;
 
-                return {
 
-                    id: order.id,
+        const rows =
+            await sequelize.query(sql, {
 
-                    invoice_no:
-                        order.code_order,
+                replacements,
 
-                    customer_name:
-                        order.customer_name,
-
-                    customer_email:
-                        maskEmail(
-                            order.customer_email
-                        ),
-
-                    customer_phone:
-                        maskPhone(
-                            order.customer_phone
-                        ),
-
-                    event_name:
-                        eventNames?.length
-                            ? [
-                                ...new Set(
-                                    eventNames
-                                )
-                            ].join(", ")
-                            : "-",
-
-                    total_amount:
-                        Number(
-                            order.buyer_pay_total
-                        ),
-
-                    organizer_net:
-                        Number(
-                            order.organizer_net_total
-                        ),
-
-                    status:
-                        order.status.toUpperCase(),
-
-                    created_at:
-                        toWIB(order.created_at),
-
-                    payment:
-
-                        pay
-                            ? {
-
-                                method:
-                                    pay.payment_method,
-
-                                status:
-                                    pay.status.toUpperCase(),
-
-                                amount:
-                                    Number(pay.amount),
-
-                                paid_at:
-
-                                    pay.paid_at
-                                        ? toWIB(pay.paid_at)
-                                        : null,
-
-                            }
-                            : null,
-
-                };
+                type: QueryTypes.SELECT
 
             });
+
+
+        // count query
+
+        const countSql = `
+
+SELECT COUNT(DISTINCT o.id) as total
+
+FROM orders o
+
+JOIN (
+
+  SELECT
+    oi.order_id,
+    tt.event_id
+  FROM order_items oi
+  JOIN ticket_types tt
+    ON tt.id = oi.ticket_type_id
+
+  UNION
+
+  SELECT
+    oi.order_id,
+    tb.event_id
+  FROM order_items oi
+  JOIN ticket_bundles tb
+    ON tb.id = oi.bundle_id
+
+) x
+ON x.order_id = o.id
+
+WHERE
+
+  ${baseWhere}
+
+  ${eventFilter}
+
+  `;
+
+        const summarySql = `
+
+SELECT
+
+  COUNT(DISTINCT o.id) as total_orders,
+
+  COALESCE(SUM(oi.quantity),0) as total_ticket_qty,
+
+  COALESCE(SUM(o.buyer_pay_total),0) as total_revenue,
+
+  COALESCE(SUM(o.organizer_net_total),0) as total_organizer_net
+
+FROM orders o
+
+JOIN (
+
+  SELECT
+    oi.order_id,
+    tt.event_id
+  FROM order_items oi
+  JOIN ticket_types tt
+    ON tt.id = oi.ticket_type_id
+
+  UNION
+
+  SELECT
+    oi.order_id,
+    tb.event_id
+  FROM order_items oi
+  JOIN ticket_bundles tb
+    ON tb.id = oi.bundle_id
+
+) x
+ON x.order_id = o.id
+
+LEFT JOIN order_items oi
+  ON oi.order_id = o.id
+
+LEFT JOIN ticket_types tt
+  ON tt.id = oi.ticket_type_id
+
+LEFT JOIN ticket_bundles tb
+  ON tb.id = oi.bundle_id
+
+LEFT JOIN events e
+  ON e.id = COALESCE(tt.event_id, tb.event_id)
+
+LEFT JOIN tickets t
+  ON t.order_item_id = oi.id
+
+LEFT JOIN payments p
+  ON p.order_id = o.id
+
+WHERE
+
+  ${baseWhere}
+
+  ${eventFilter}
+
+  ${searchWhere}
+
+`;
+
+        const [summary] =
+            await sequelize.query(summarySql, {
+
+                replacements,
+
+                type: QueryTypes.SELECT
+
+            });
+
+
+        const [{ total }] =
+            await sequelize.query(countSql, {
+
+                replacements,
+
+                type: QueryTypes.SELECT
+
+            });
+
 
         return {
 
-            rows:
-                formattedRows,
+            rows: rows.map(r => ({
 
-            count,
+                id: r.id,
 
-            page:
-                Number(page),
+                invoice_no: r.code_order,
 
-            perPage:
-                limit,
+                customer_name: r.customer_name,
+
+                customer_email:
+                    maskEmail(r.customer_email),
+
+                customer_phone:
+                    maskPhone(r.customer_phone),
+
+                event_name:
+                    r.event_names || "-",
+
+                total_ticket_qty:
+                    Number(r.total_ticket_qty || 0),
+
+                total_amount:
+                    Number(r.buyer_pay_total),
+
+                organizer_net:
+                    Number(r.organizer_net_total),
+
+                status:
+                    r.status.toUpperCase(),
+
+                created_at:
+                    toWIB(r.created_at),
+
+                payment: {
+
+                    method:
+                        r.payment_method,
+
+                    status:
+                        (r.payment_status || r.status)
+                            .toUpperCase(),
+
+                    amount:
+                        Number(r.amount),
+
+                    paid_at:
+                        r.paid_at
+                            ? toWIB(r.paid_at)
+                            : null
+
+                }
+
+            })),
+
+            count: total,
+
+            page,
+
+            perPage: limit,
 
             totalPages:
-                Math.ceil(count / limit),
-
+                Math.ceil(total / limit),
             summary: {
 
                 total_orders:
-                    summaryRows.length,
+                    Number(summary.total_orders || 0),
 
                 total_ticket_qty:
-                    totalTicketQty,
+                    Number(summary.total_ticket_qty || 0),
 
                 total_revenue:
-                    totalRevenue,
+                    Number(summary.total_revenue || 0),
 
                 total_organizer_net:
-                    totalOrganizerNet,
+                    Number(summary.total_organizer_net || 0),
 
             }
 
@@ -327,11 +429,39 @@ module.exports = {
                     model: OrderItem,
                     as: "items",
                     include: [
+
                         {
                             model: TicketType,
                             as: "ticket_type",
-                            include: [{ model: Event, as: "event" }],
+                            include: [
+                                { model: Event, as: "event" }
+                            ]
                         },
+
+                        {
+                            model: TicketBundles,
+                            as: "ticket_bundles",
+                            include: [
+
+                                {
+                                    model: Event,
+                                    as: "event"
+                                },
+
+                                {
+                                    model: TicketBundleItem,
+                                    as: "items",
+                                    include: [
+                                        {
+                                            model: TicketType,
+                                            as: "ticket_type"
+                                        }
+                                    ]
+                                }
+
+                            ]
+                        },
+
                         {
                             model: Ticket,
                             as: "tickets",
@@ -341,10 +471,11 @@ module.exports = {
                                 "owner_email",
                                 "status",
                                 "issued_at",
-                                "sent_at",
-                            ],
-                        },
-                    ],
+                                "sent_at"
+                            ]
+                        }
+
+                    ]
                 },
                 {
                     model: Payment,
@@ -378,6 +509,9 @@ module.exports = {
             .filter(t => t.sent_at)
             .sort((a, b) => new Date(a.sent_at) - new Date(b.sent_at))[0];
 
+        const paymentStatus =
+            normalizePaymentStatus(order, pay);
+
         const timeline = [
             {
                 key: "created",
@@ -397,7 +531,7 @@ module.exports = {
                 key: "paid",
                 label: "Paid",
                 date: pay?.status === "paid" ? toWIB(pay.paid_at) : null,
-                active: pay?.status === "paid",
+                active: paymentStatus === "paid",
             },
             {
                 key: "issued",
@@ -413,6 +547,13 @@ module.exports = {
             },
         ];
 
+        const eventNames =
+            order.items
+                ?.map(i =>
+                    i.ticket_type?.event?.name
+                )
+                .filter(Boolean);
+
         return {
             id: order.id,
             invoice_no: order.code_order,
@@ -420,14 +561,14 @@ module.exports = {
             customer_name: order.customer_name,
             customer_email: maskEmail(order.customer_email),
             customer_phone: maskPhone(order.customer_phone),
-
+            event_name: eventNames?.length
+                ? [...new Set(eventNames)].join(", ")
+                : "-",
             total_amount: Number(order.buyer_pay_total),
             organizer_net: Number(order.organizer_net_total),
 
             status: order.status.toUpperCase(),
             created_at: toWIB(order.created_at),
-
-            event_name: order.items[0]?.ticket_type?.event?.name ?? "-",
 
             total_ticket_qty: totalTicketQty,
             total_ticket_types: totalTicketTypes,
@@ -436,123 +577,322 @@ module.exports = {
             payment: pay
                 ? {
                     method: pay.payment_method,
-                    status: pay.status.toUpperCase(),
+
+                    status:
+                        paymentStatus
+                            ? paymentStatus.toUpperCase()
+                            : "UNPAID",
+
                     amount: Number(pay.amount),
-                    paid_at: pay.paid_at ? toWIB(pay.paid_at) : null,
+
+                    paid_at:
+                        pay.paid_at &&
+                            pay.status === "paid"
+                            ? toWIB(pay.paid_at)
+                            : null,
                 }
-                : null,
+                : {
+                    method: null,
+                    status: order.status.toUpperCase(),
+                    amount: Number(order.buyer_pay_total),
+                    paid_at: null
+                },
 
             timeline,
 
-            items: order.items.map((i) => ({
-                id: i.id,
-                ticket_type_name: i.ticket_type?.name,
-                event_name: i.ticket_type?.event?.name,
-                quantity: i.quantity,
-                ticket_price: Number(i.ticket_price),
+            items: order.items.map(i => {
 
-                admin_fee: Number(i.admin_fee_amount),
-                tax: Number(i.tax_amount),
+                const isBundle =
+                    i.item_type === "bundle";
 
-                total_price: Number(i.buyer_pay_amount),
-                organizer_net: Number(i.organizer_net),
+                return {
 
-                tickets:
-                    i.tickets?.map((t) => ({
-                        ticket_code: t.ticket_code,
-                        owner_name: t.owner_name,
-                        owner_email: maskEmail(t.owner_email),
-                        status: t.status,
-                        issued_at: t.issued_at ? toWIB(t.issued_at) : null,
-                        sent_at: t.sent_at ? toWIB(t.sent_at) : null,
-                    })) ?? [],
-            })),
+                    id: i.id,
+
+                    item_type:
+                        i.item_type,
+
+                    name:
+
+                        isBundle
+                            ? i.ticket_bundles?.name
+                            : i.ticket_type?.name,
+
+                    event_name:
+
+                        isBundle
+                            ? i.ticket_bundles?.event?.name
+                            : i.ticket_type?.event?.name,
+
+                    quantity:
+                        i.quantity,
+
+                    ticket_price:
+                        Number(i.ticket_price),
+
+                    admin_fee:
+                        Number(i.admin_fee_amount),
+
+                    tax:
+                        Number(i.tax_amount),
+
+                    total_price:
+                        Number(i.buyer_pay_amount),
+
+                    organizer_net:
+                        Number(i.organizer_net),
+
+                    bundle_items:
+
+                        isBundle
+                            ? i.ticket_bundles?.items?.map(b => ({
+
+                                ticket_type_name:
+                                    b.ticket_type?.name,
+
+                                qty:
+                                    b.quantity
+
+                            }))
+                            : [],
+
+                    tickets:
+
+                        i.tickets?.map(t => ({
+
+                            ticket_code:
+                                t.ticket_code,
+
+                            owner_name:
+                                t.owner_name,
+
+                            owner_email:
+                                maskEmail(t.owner_email),
+
+                            status:
+                                t.status,
+
+                            issued_at:
+                                t.issued_at
+                                    ? toWIB(t.issued_at)
+                                    : null,
+
+                            sent_at:
+                                t.sent_at
+                                    ? toWIB(t.sent_at)
+                                    : null,
+
+                        })) ?? []
+
+                };
+
+            }),
         };
     },
 
-    async getExportData(params) {
-        const { search, status, payment_method, creator_id, event_id, start_date, end_date } = params;
+    async getExportData({
+        search,
+        status,
+        payment_method,
+        creator_id,
+        event_id,
+        start_date,
+        end_date
+    }) {
 
-        const where = {
+        const replacements = {
             creator_id,
-            ...(status !== "ALL" && status ? { status: status.toLowerCase() } : {}),
-            ...buildDateRange(start_date, end_date)
+            search: search ? `%${search}%` : null,
+            status: status && status !== "ALL" ? status.toLowerCase() : null,
+            payment_method:
+                payment_method && payment_method !== "ALL"
+                    ? payment_method
+                    : null,
+            event_id: event_id && event_id !== "ALL" ? event_id : null,
+            start_date,
+            end_date
         };
 
-        if (search) {
-            where[Op.or] = [
-                { code_order: { [Op.like]: `%${search}%` } },
-                { customer_name: { [Op.like]: `%${search}%` } },
-                { customer_email: { [Op.like]: `%${search}%` } },
-                { customer_phone: { [Op.like]: `%${search}%` } },
-                { "$items.tickets.ticket_code$": { [Op.like]: `%${search}%` } },
-            ];
-        }
 
-        if (event_id) {
-            where["$items.ticket_type.event.id$"] = event_id;
-        }
+        const sql = `
 
-        if (payment_method && payment_method !== "ALL") {
-            where["$payments.payment_method$"] = payment_method;
-        }
+SELECT
 
-        const rows = await Order.findAll({
-            where,
-            include: [
-                {
-                    model: OrderItem,
-                    as: "items",
-                    include: [
-                        {
-                            model: TicketType,
-                            as: "ticket_type",
-                            include: [{ model: Event, as: "event" }],
-                        },
-                        {
-                            model: Ticket,
-                            as: "tickets",
-                        },
-                    ],
-                },
-                { model: Payment, as: "payments" },
-            ],
-            order: [["created_at", "DESC"]],
-        });
+  o.code_order AS invoice_no,
 
-        const exportRows = [];
+  e.name AS event_name,
 
-        rows.forEach(order => {
-            const pay = order.payments?.[0] ?? null;
+  COALESCE(tt.name, tb.name) AS ticket_type,
 
-            order.items.forEach(item => {
-                exportRows.push({
-                    invoice_no: order.code_order,
-                    event_name: item.ticket_type.event.name,
-                    ticket_type: item.ticket_type.name,
-                    quantity: item.quantity,
-                    ticket_price: Number(item.ticket_price),
+  oi.quantity,
 
-                    admin_fee_amount: Number(item.admin_fee_amount),
-                    tax_amount: Number(item.tax_amount),
-                    buyer_pay_amount: Number(item.buyer_pay_amount),
+  oi.ticket_price,
 
-                    total_ticket_qty: item.quantity,
-                    total_order: Number(order.buyer_pay_total),
+  oi.admin_fee_amount,
 
-                    customer_name: order.customer_name,
-                    customer_email: maskEmail(order.customer_email),
+  oi.tax_amount,
 
-                    payment_method: pay?.payment_method || "-",
-                    payment_status: pay?.status?.toUpperCase() || "-",
-                    paid_at: pay?.paid_at ? toWIB(pay.paid_at) : "-",
+  oi.buyer_pay_amount,
 
-                    created_at: toWIB(order.created_at)
-                });
+  o.buyer_pay_total AS total_order,
+
+  o.customer_name,
+
+  o.customer_email,
+
+  p.payment_method,
+
+  UPPER(COALESCE(p.status,o.status))
+    AS payment_status,
+
+  p.paid_at,
+
+  o.created_at
+
+
+FROM order_items oi
+
+JOIN orders o
+  ON o.id = oi.order_id
+
+
+LEFT JOIN ticket_types tt
+  ON tt.id = oi.ticket_type_id
+
+
+LEFT JOIN ticket_bundles tb
+  ON tb.id = oi.bundle_id
+
+
+LEFT JOIN events e
+  ON e.id =
+    COALESCE(
+      tt.event_id,
+      tb.event_id
+    )
+
+
+LEFT JOIN payments p
+  ON p.order_id = o.id
+
+
+LEFT JOIN tickets t
+  ON t.order_item_id = oi.id
+
+
+WHERE
+
+  o.creator_id = :creator_id
+
+
+  ${status && status !== "ALL"
+                ? "AND o.status = :status"
+                : ""}
+
+
+  ${payment_method && payment_method !== "ALL"
+                ? "AND p.payment_method = :payment_method"
+                : ""}
+
+
+  ${event_id
+                ? `
+      AND e.id = :event_id
+    `
+                : ""}
+
+
+  ${start_date && end_date
+                ? `
+      AND o.created_at BETWEEN
+      CONCAT(:start_date,' 00:00:00')
+      AND CONCAT(:end_date,' 23:59:59')
+    `
+                : ""}
+
+
+  ${search
+                ? `
+
+      AND (
+
+        o.code_order LIKE :search
+        OR o.customer_name LIKE :search
+        OR o.customer_email LIKE :search
+
+        OR e.name LIKE :search
+        OR tt.name LIKE :search
+        OR tb.name LIKE :search
+        OR t.ticket_code LIKE :search
+
+      )
+
+    `
+                : ""}
+
+
+ORDER BY o.created_at DESC
+
+  `;
+
+
+        const rows =
+            await sequelize.query(sql, {
+                replacements,
+                type: QueryTypes.SELECT
             });
-        });
 
-        return exportRows;
+
+        return rows.map(r => ({
+
+            invoice_no: r.invoice_no,
+
+            event_name:
+                r.event_name || "-",
+
+            ticket_type:
+                r.ticket_type || "-",
+
+            quantity:
+                Number(r.quantity),
+
+            ticket_price:
+                Number(r.ticket_price),
+
+            admin_fee_amount:
+                Number(r.admin_fee_amount),
+
+            tax_amount:
+                Number(r.tax_amount),
+
+            buyer_pay_amount:
+                Number(r.buyer_pay_amount),
+
+            total_order:
+                Number(r.total_order),
+
+            customer_name:
+                r.customer_name,
+
+            customer_email:
+                maskEmail(r.customer_email),
+
+            payment_method:
+                r.payment_method || "-",
+
+            status:
+                r.payment_status,
+
+            paid_at:
+                r.paid_at
+                    ? toWIB(r.paid_at)
+                    : "-",
+
+            created_at:
+                toWIB(r.created_at)
+
+        }));
+
     }
 
 };
@@ -569,4 +909,13 @@ function extractEventName(order) {
 
     // jika multi event
     return events.join(", ");
+}
+
+function normalizePaymentStatus(order, pay) {
+
+    if (pay?.status)
+        return pay.status.toUpperCase();
+
+    return order.status.toUpperCase();
+
 }

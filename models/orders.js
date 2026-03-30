@@ -28,7 +28,7 @@ module.exports = (sequelize, DataTypes) => {
       admin_fee_bearer: DataTypes.ENUM("buyer", "organizer","mixed"),
       tax_bearer: DataTypes.ENUM("buyer", "organizer","mixed"),
 
-      status: DataTypes.STRING,
+      status: DataTypes.ENUM("pending", "waiting_payment", "paid", "expired", "canceled"),
       payment_method: DataTypes.STRING,
       expired_at: DataTypes.DATE,
     },

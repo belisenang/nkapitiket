@@ -9,6 +9,7 @@ const { Creator } = require("../../../models");
 module.exports = {
 
   async pagination(req, res) {
+    
     try {
       const creator_id = req.user.creator_id;
 
@@ -78,27 +79,112 @@ module.exports = {
 
   async exportCSV(req, res) {
     try {
+
       const creator_id = req.user.creator_id;
 
-      const data = await service.getExportData({
-        search: req.query.search,
-        status: req.query.status,
-        creator_id,
-        event_id: req.query.event_id || null,
-        start_date: req.query.start_date || null,
-        end_date: req.query.end_date || null,
-      });
+      const data =
+        await service.getExportData({
 
-      const parser = new Parser();
-      const csv = parser.parse(data);
+          search: req.query.search,
 
-      res.setHeader("Content-Type", "text/csv");
-      res.setHeader("Content-Disposition", "attachment; filename=orders.csv");
+          status: req.query.status,
+
+          creator_id,
+
+          event_id:
+            req.query.event_id &&
+              req.query.event_id !== "ALL"
+              ? req.query.event_id
+              : null,
+
+
+          payment_method:
+            req.query.payment_method &&
+              req.query.payment_method !== "ALL"
+              ? req.query.payment_method
+              : null,
+
+          start_date:
+            req.query.start_date || null,
+
+          end_date:
+            req.query.end_date || null,
+
+        });
+
+
+      const fields = [
+
+        "invoice_no",
+
+        "event_name",
+
+        "ticket_type",
+
+        "quantity",
+
+        "ticket_price",
+
+        "admin_fee_amount",
+
+        "tax_amount",
+
+        "buyer_pay_amount",
+
+        "total_order",
+
+        "customer_name",
+
+        "customer_email",
+
+        "payment_method",
+
+        "status",
+
+        "paid_at",
+
+        "created_at"
+
+      ];
+
+
+      const parser =
+        new Parser({
+          fields
+        });
+
+
+      const csv =
+        parser.parse(
+          data || []
+        );
+
+
+      res.setHeader(
+        "Content-Type",
+        "text/csv"
+      );
+
+
+      res.setHeader(
+        "Content-Disposition",
+        "attachment; filename=orders.csv"
+      );
+
+
       return res.send(csv);
 
     } catch (err) {
-      console.error(err);
-      return res.status(500).json({ success: false, message: "Failed export CSV" });
+
+      console.error("CSV ERROR:", err);
+
+      return res
+        .status(500)
+        .json({
+          success: false,
+          message: err.message
+        });
+
     }
   },
 
@@ -110,7 +196,20 @@ module.exports = {
         search: req.query.search,
         status: req.query.status,
         creator_id,
-        event_id: req.query.event_id || null,
+
+        event_id:
+          req.query.event_id &&
+            req.query.event_id !== "ALL"
+            ? req.query.event_id
+            : null,
+
+
+        payment_method:
+          req.query.payment_method &&
+            req.query.payment_method !== "ALL"
+            ? req.query.payment_method
+            : null,
+
         start_date: req.query.start_date || null,
         end_date: req.query.end_date || null,
       });
@@ -157,7 +256,19 @@ module.exports = {
         search: req.query.search,
         status: req.query.status,
         creator_id,
-        event_id: req.query.event_id || null,
+
+        event_id:
+          req.query.event_id &&
+            req.query.event_id !== "ALL"
+            ? req.query.event_id
+            : null,
+
+
+        payment_method:
+          req.query.payment_method &&
+            req.query.payment_method !== "ALL"
+            ? req.query.payment_method
+            : null,
         start_date: req.query.start_date || null,
         end_date: req.query.end_date || null,
       });

@@ -11,10 +11,12 @@ router.get("/kategori/:slug/events", cacheMiddleware({ ttl: 300 }), controller.g
 router.get("/event", cacheMiddleware({ ttl: 300 }), controller.eventAll);
 router.get("/events", cacheMiddleware({ ttl: 300 }), controller.searchEvents);
 router.get("/event/:slug", cacheMiddleware({ ttl: 300 }), controller.getOneEvent);
-router.get("/event/tickets/:slug", cacheMiddleware({ ttl: 30 }), controller.getTicketEvent);
+router.get("/event/tickets/:slug", controller.getTicketEvent);
 
 router.use("/checkout", checkoutRoute);
 router.use("/payment", paymentRoute);
 
 router.use("/auth/customer", customerAuthRoute);
+// dashboard route
+router.use("/dashboard", controller.dashboard);
 module.exports = router;
