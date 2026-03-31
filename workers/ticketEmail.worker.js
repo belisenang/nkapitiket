@@ -1,6 +1,6 @@
 const { Worker } = require("bullmq");
 
-const connection =
+const connection = 
     require("../utils/redisBull");
 
 const { Ticket } =

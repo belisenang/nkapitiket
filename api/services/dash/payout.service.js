@@ -1,19 +1,19 @@
 // services/dash/payout.service.js
 const {
+    sequelize,
     Payouts,
     CreatorFinancials,
     Order,
     Payment,
     User
 } = require("../../../models");
-const bcrypt = require("../../../utils/bcrypt");
 const { Op } = require("sequelize");
 const { toWIB } = require("../../utils/wib");
 
 function normalizeAmount(raw) {
     if (!raw) return 0;
     return Number(String(raw).replace(/[^0-9]/g, ""));
-} 
+}
 
 module.exports = {
 
@@ -182,79 +182,153 @@ module.exports = {
         });
     },
 
-    async createPayout(creator_id, rawAmount, io) {
+    async createPayout(
+        creator_id,
+        rawAmount,
+        io
+    ) {
 
         const amount =
-            normalizeAmount(rawAmount);
+            normalizeAmount(rawAmount)
 
         if (!amount || amount <= 0)
-            throw new Error("Invalid payout amount");
-
-
-        const fin =
-            await CreatorFinancials.findOne({
-                where: { creator_id }
-            });
-
-
-        if (!fin)
             throw new Error(
-                "Financial record not found"
-            );
+                "Invalid payout amount"
+            )
 
-        const existingRequest =
-            await Payouts.findOne({
+        if (amount < 50000)
+            throw new Error(
+                "Minimum payout 50.000"
+            )
 
-                where: {
+        const trx =
+            await CreatorFinancials
+                .sequelize
+                .transaction()
+
+        try {
+
+            const fin =
+                await CreatorFinancials
+                    .findOne({
+
+                        where: {
+                            creator_id
+                        },
+
+                        transaction: trx,
+
+                        lock:
+                            trx.LOCK.UPDATE
+
+                    })
+
+
+            if (!fin)
+                throw new Error(
+                    "Financial record not found"
+                )
+
+            const existingRequest =
+                await Payouts.findOne({
+
+                    where: {
+
+                        creator_id,
+
+                        status: {
+                            [Op.in]: [
+                                "REQUESTED",
+                                "PROCESSING",
+                                "APPROVED"
+                            ]
+                        }
+
+                    },
+
+                    transaction: trx,
+
+                    lock: trx.LOCK.UPDATE
+
+                })
+
+
+            if (existingRequest)
+                throw new Error(
+                    "Masih ada payout diproses"
+                )
+
+
+            const balance =
+                Number(fin.current_balance)
+
+
+            if (balance < amount)
+                throw new Error(
+                    "Insufficient balance"
+                )
+
+
+            fin.current_balance =
+                balance - amount
+
+
+            fin.total_payout =
+                Number(fin.total_payout)
+                + amount
+
+
+            await fin.save({
+
+                transaction: trx
+
+            })
+
+            const payout =
+                await Payouts.create({
+
                     creator_id,
+
+                    amount,
+
                     status: "REQUESTED"
+
+                },
+
+                    {
+
+                        transaction: trx
+
+                    })
+
+
+            await trx.commit()
+
+            io.to(
+                `creator-${creator_id}`
+            ).emit(
+                "finance:update",
+                {
+
+                    type: "payout",
+
+                    amount
+
                 }
-
-            });
-
-
-        if (existingRequest)
-            throw new Error(
-                "Masih ada payout diproses"
-            );
-
-        const balance =
-            Number(fin.current_balance);
+            )
 
 
-        if (balance < amount)
-            throw new Error(
-                "Insufficient balance"
-            );
+            return payout
 
-        fin.current_balance =
-            balance - amount;
+        }
 
+        catch (err) {
 
-        fin.total_payout =
-            Number(fin.total_payout) + amount;
+            await trx.rollback()
 
+            throw err
 
-        await fin.save();
-
-        io.to(`creator-${creator_id}`)
-            .emit("finance:update", {
-
-                type: "payout",
-                amount
-
-            });
-
-
-        return await Payouts.create({
-
-            creator_id,
-
-            amount,
-
-            status: "REQUESTED"
-
-        });
+        }
 
     },
 

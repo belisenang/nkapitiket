@@ -1,4 +1,5 @@
 module.exports = {
+
   apps: [
 
     {
@@ -6,19 +7,22 @@ module.exports = {
 
       script: "./server.js",
 
-      instances: 1,
-      exec_mode: "fork",
+      instances: "max",
 
-      autorestart: true,
+      exec_mode: "cluster",
 
       watch: false,
 
-      max_memory_restart: "300M",
+      max_memory_restart: "500M",
 
       env: {
+
         NODE_ENV: "production",
-        PORT: 5000
+
+        PORT: 3000
+
       }
+
     },
 
     {
@@ -27,16 +31,11 @@ module.exports = {
       script: "./worker.server.js",
 
       instances: 1,
-      exec_mode: "fork",
 
-      autorestart: true,
+      max_memory_restart: "300M"
 
-      watch: false,
-
-      env: {
-        NODE_ENV: "production"
-      }
     }
 
   ]
+
 }

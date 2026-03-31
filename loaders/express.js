@@ -10,33 +10,47 @@ const sanitize = require('../api/middlewares/xss.middleware');
 const path = require("path");
 const cookieParser = require("cookie-parser");
 const csrf = require("csurf");
-
+const { sequelize } = require("../models");
+const redis = require("../utils/redisBull");
+const { Queue } = require("bullmq")
+const connection = require("../utils/redisBull")
 module.exports = () => {
   const app = express();
   app.set("trust proxy", 1);
   app.use(cookieParser());
   app.use(express.json());
   app.use(express.urlencoded({ extended: true }));
-  const allowedOrigins = [
-    "http://localhost:4000",
-    "https://dash-belisenang.vercel.app",
-  ];
 
-  app.use(
-    cors({
-      origin: [
-        "http://localhost:4000",
-        "https://dash-belisenang.vercel.app",
-      ],
-      credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-      allowedHeaders: [
-        "Content-Type",
-        "Authorization",
-        "x-api-key"
-      ],
-    })
-  );
+  const allowedOrigins = process.env.CORS_ORIGIN
+
+  app.use(cors({
+    origin: function (origin, callback) {
+
+      if (!origin) return callback(null, true)
+
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true)
+      }
+
+      return callback(new Error("Not allowed by CORS"))
+    },
+
+    credentials: true,
+
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "DELETE"
+    ],
+
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-api-key"
+    ]
+
+  }))
 
   app.use(compression())
   app.use(sanitize);
@@ -80,19 +94,49 @@ module.exports = () => {
     express.static(path.join(__dirname, "../public/uploads"))
   );
 
-  app.get("/health", (req, res) => {
-
-    res.status(200).json({
-
-      status: "ok",
-      uptime: process.uptime(),
-      timestamp: new Date()
-
-    })
-
+  app.get("/health", (req, res, next) => {
+    if (req.headers["x-api-key"] !== process.env.HEALTH_KEY) {
+      return res.status(403).json({ status: "forbidden" })
+    }
+    next()
   })
-  // Load Swagger docs
-  // swaggerLoader(app);
+
+  app.get("/health", async (req, res) => {
+    try {
+
+      await sequelize.authenticate()
+
+      await redis.ping()
+
+      const emailQueue = new Queue("ticket-email", { connection })
+      const counts = await emailQueue.getJobCounts()
+
+      res.json({
+        status: "ok",
+        uptime: process.uptime(),
+        timestamp: new Date(),
+        services: {
+          database: "connected",
+          redis: "connected"
+        },
+        memory: {
+          rss: process.memoryUsage().rss,
+          heapUsed: process.memoryUsage().heapUsed
+        },
+        queues: {
+          "ticket-email": counts
+        }
+      })
+
+    } catch (err) {
+
+      res.status(500).json({
+        status: "error",
+        message: err.message
+      })
+
+    }
+  })
 
   app.use(errorHandler);
 

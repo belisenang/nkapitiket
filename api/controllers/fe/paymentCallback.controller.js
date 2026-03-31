@@ -42,23 +42,6 @@ module.exports = {
 
     try {
 
-      const token =
-        req.headers["x-callback-token"];
-
-      if (
-        token !==
-        process.env.XENDIT_CALLBACK_TOKEN
-      ) {
-
-        return res
-          .status(401)
-          .json({
-            message: "Invalid token"
-          });
-
-      }
-
-
       const {
 
         id,
