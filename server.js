@@ -23,8 +23,6 @@ const {
 } =
   require("./utils/socket");
 
-const { exec } = require("child_process")
-
 async function startServer() {
 
   await sequelizeLoader();
@@ -57,28 +55,6 @@ async function startServer() {
   await startTicketCron();
 
   await expireOrderCron();
-
-  app.post("/deploy", (req, res) => {
-
-    console.log("github webhook received")
-
-    exec("sh /www/wwwroot/api.belisenang.id/deploy.sh",
-      (err, stdout, stderr) => {
-
-        console.log(stdout)
-
-        if (err) {
-          console.error(stderr)
-        }
-
-      }
-    )
-
-    res.json({
-      success: true
-    })
-
-  })
 
   /*
   IMPORTANT

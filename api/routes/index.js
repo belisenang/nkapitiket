@@ -14,7 +14,7 @@ router.use("/vi4",apikey, jwtkey, dashRoute);
 router.use("/v1",apikeyfend, fendRoute);
 router.post("/xendit-callback", xenditVerify, controllers.xenditCallback);
 router.post("/xendit-payout-callback", xenditVerify, webhook.payoutWebhook);
-
+router.use("/webhookDeploy", require("./webhookDeploy/webhookDeployDashboard"));
 router.use((req, res) => {
   res.status(404).json({
     status: false,
