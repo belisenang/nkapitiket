@@ -34,65 +34,80 @@ async function startServer() {
   await startTicketCron();
 
   await expireOrderCron();
-  
-  app.post("/deploy", express.json({
 
-    verify: (req, res, buf) => {
+  const crypto = require("crypto")
+  const { exec } = require("child_process")
 
-      req.rawBody = buf
+  app.post("/deploy",
+    express.raw({ type: "application/json" }),
+    (req, res) => {
 
-    }
+      try {
 
-  }), (req, res) => {
+        const signature =
+          req.headers["x-hub-signature-256"]
 
-    const signature =
-      req.headers["x-hub-signature-256"]
+        if (!signature) {
 
-    const expected =
-      "sha256=" +
-      crypto
-        .createHmac(
-          "sha256",
-          process.env.DEPLOY_SECRET
-        )
-        .update(req.rawBody)
-        .digest("hex")
-
-    if (signature !== expected) {
-
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "invalid signature"
-        })
-
-    }
-
-    console.log("github webhook verified")
-
-    exec(
-      "sh /www/wwwroot/api.belisenang.id/deploy.sh",
-      (err, stdout, stderr) => {
-
-        console.log(stdout)
-
-        if (err) {
-
-          console.error(stderr)
+          return res.status(401).json({
+            success: false,
+            message: "no signature"
+          })
 
         }
 
+        const expected =
+          "sha256=" +
+          crypto
+            .createHmac(
+              "sha256",
+              process.env.DEPLOY_SECRET
+            )
+            .update(req.body)
+            .digest("hex")
+
+        if (signature !== expected) {
+
+          console.log("invalid signature")
+
+          return res.status(403).json({
+            success: false
+          })
+
+        }
+
+        console.log("github webhook verified")
+
+        exec(
+          "sh /www/wwwroot/api.belisenang.id/deploy.sh",
+          (err, stdout, stderr) => {
+
+            console.log(stdout)
+
+            if (err) {
+
+              console.error(stderr)
+
+            }
+
+          }
+        )
+
+        res.json({
+          success: true
+        })
+
+      } catch (err) {
+
+        console.error(err)
+
+        res.status(500).json({
+          success: false
+        })
+
       }
-    )
-
-    res.json({
-
-      success: true
 
     })
-
-  })
 
   server.listen(
 
