@@ -80,7 +80,7 @@ async function startServer() {
 
   });
 
-  app.post("/dashboard", (req, res) => {
+  app.post("/webhook-dashboard", (req, res) => {
 
     console.log("webhook dashboard triggered");
 
