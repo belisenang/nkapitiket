@@ -1,35 +1,58 @@
-const express = require("express")
 require("dotenv").config();
 
-const http = require("http");
+const http =
+  require("http");
 
-const expressLoader = require("./loaders/express");
+const expressLoader =
+  require("./loaders/express");
 
-const sequelizeLoader = require("./loaders/sequelize");
+const sequelizeLoader =
+  require("./loaders/sequelize");
 
-const logger = require("./config/logger");
+const logger =
+  require("./config/logger");
 
-const startTicketCron = require("./api/cron/ticketSender.cron");
+const startTicketCron =
+  require("./api/cron/ticketSender.cron");
 
-const expireOrderCron = require("./api/cron/expireOrder.cron");
+const expireOrderCron =
+  require("./api/cron/expireOrder.cron");
 
-const { initSocket } = require("./utils/socket");
+const {
+  initSocket
+} =
+  require("./utils/socket");
 
 const { exec } = require("child_process")
-const crypto = require("crypto")
+
 async function startServer() {
 
   await sequelizeLoader();
 
-  const app = expressLoader();
+  const app =
+    expressLoader();
 
-  const server = http.createServer(app);
 
-  const io = initSocket(server);
+  /*
+  create HTTP server
+  */
+  const server =
+    http.createServer(app);
+
+
+  /*
+  attach socket
+  */
+  const io =
+    initSocket(server);
+
 
   app.set("io", io);
 
-  const PORT = process.env.PORT || 5000;
+
+  const PORT =
+    process.env.PORT || 3000;
+
 
   await startTicketCron();
 
@@ -55,8 +78,11 @@ async function startServer() {
       success: true
     })
 
-  });
+  })
 
+  /*
+  IMPORTANT
+  */
   server.listen(
 
     PORT,
