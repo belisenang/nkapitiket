@@ -78,31 +78,21 @@ async function startServer() {
       success: true
     })
 
-  }); 
+  });
 
   app.post("/dashboard", (req, res) => {
-  
-      console.log("webhook dashboard triggered");
-  
-      exec("/www/wwwroot/deploy-dashboard.sh", (err, stdout, stderr) => {
-  
-          if (err) {
-              console.error(stderr);
-              return res.status(500).json({
-                  success: false,
-                  error: stderr
-              });
-          }
-  
-          console.log(stdout);
-  
-          res.json({
-              success: true,
-              message: "dashboard deployed"
-          });
-  
-      });
-  
+
+    console.log("webhook dashboard triggered");
+
+    // langsung respon dulu agar github tidak timeout
+    res.status(200).json({
+      success: true,
+      message: "deploy started"
+    });
+
+    // jalankan deploy di background
+    exec("nohup sh /www/wwwroot/deploy-dashboard.sh > /www/wwwroot/deploy-dashboard.log 2>&1 &");
+
   });
 
   /*
