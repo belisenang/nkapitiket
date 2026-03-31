@@ -35,9 +35,6 @@ async function startServer() {
 
   await expireOrderCron();
 
-  const crypto = require("crypto")
-  const { exec } = require("child_process")
-
   app.post("/deploy",
     express.raw({ type: "application/json" }),
     (req, res) => {
