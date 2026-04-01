@@ -46,8 +46,8 @@ module.exports = {
       if (token) await service.logout(token);
 
       res
-        .clearCookie("access_token")
-        .clearCookie("refresh_token")
+        .clearCookie("access_token", cookieConfig.accessCookie)
+        .clearCookie("refresh_token", cookieConfig.refreshCookie)
         .json({
           status: true,
           message: "Logged out",
