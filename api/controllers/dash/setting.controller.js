@@ -3,6 +3,16 @@
 const settingsService = require("../../services/dash/setting.service");
 
 module.exports = {
+  async getSettings(req, res) {
+    try {
+      const creator_id = req.user.creator_id;
+      const settings = await settingsService.getSettings(creator_id);
+      res.json({ success: true, data: settings });
+    } catch (err) {
+      res.status(500).json({ success: false, message: err.message });
+    }
+  },
+
   // Ambil tarif pajak
   async getTaxRate(req, res) {
     try {
@@ -19,7 +29,6 @@ module.exports = {
         },
       });
     } catch (err) {
-      console.error(err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -37,7 +46,6 @@ module.exports = {
         data: adminFee,
       });
     } catch (err) {
-      console.error(err);
       res.status(500).json({ success: false, message: err.message });
     }
   },
@@ -53,7 +61,6 @@ module.exports = {
         message: "Tarif pajak berhasil diperbarui",
       });
     } catch (err) {
-      console.error(err);
       res.status(500).json({ success: false, message: err.message });
     }
   },

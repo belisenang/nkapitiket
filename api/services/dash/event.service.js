@@ -116,7 +116,7 @@ module.exports = {
       } catch (e) {
         event.social_link = null;
       }
-    }
+    } 
 
     const rawData = await this.getRevenue7Days(eventId);
     const revenue7days = fillMissingDays(rawData);

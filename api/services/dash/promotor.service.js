@@ -166,14 +166,12 @@ module.exports = {
             owner_user_id: user.id
         });
 
-        // 6. Add to CreatorUserMember
         await CreatorUserMember.create({
             user_id: user.id,
             creator_id: creator.id,
             role_id: ROLES.PROMOTOR_OWNER_ID
         });
 
-        // 8. Remove sensitive fields
         const userSafe = user.toJSON();
         delete userSafe.password_hash;
 
