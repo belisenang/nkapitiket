@@ -12,8 +12,8 @@ const webhook = require("../webhook/payout.webhook");
 router.use("/auth/admin", apikey, adminAuthRoute); 
 router.use("/vi4",apikey, jwtkey, dashRoute);
 router.use("/v1",apikeyfend, fendRoute);
-router.post("/xendit-callback", xenditVerify, controllers.xenditCallback);
-router.post("/xendit-payout-callback", xenditVerify, webhook.payoutWebhook);
+router.post("/xendit-callback", controllers.xenditCallback);
+router.post("/xendit-payout-callback", webhook.payoutWebhook);
 router.use((req, res) => {
   res.status(404).json({
     status: false,
