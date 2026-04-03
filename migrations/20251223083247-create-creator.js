@@ -28,6 +28,23 @@ module.exports = {
         type: Sequelize.TEXT,
         allowNull: true,
       },
+
+      is_active: {
+        type: Sequelize.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+
+      approved_by: {
+        type: Sequelize.UUID,
+        allowNull: true,
+      },
+
+      allowed_at: {
+        type: Sequelize.DATE,
+        allowNull: true,
+      },
+
       social_link: {
         type: Sequelize.JSON,
         allowNull: true,

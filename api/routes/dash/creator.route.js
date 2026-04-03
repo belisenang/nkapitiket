@@ -20,13 +20,11 @@ router.post("/:id/finance", controller.updateFinanceSettings);
 
 router.get(
     "/:id/bank-accounts",
-    creatorGuard("PROMOTOR_OWNER"),
     controller.getBankAccounts
 );
 
 router.post(
     "/:id/bank-accounts",
-    creatorGuard("PROMOTOR_OWNER"),
     validate(schema.bankAccount),
     controller.upsertBankAccount
 );
@@ -39,7 +37,6 @@ router.post(
 
 router.get(
     "/:id/documents",
-    creatorGuard("PROMOTOR_OWNER"),
     controller.getDocuments
 );
 
@@ -53,5 +50,10 @@ router.post(
     ]),
     validate(schema.documents),
     controller.upsertDocuments
+);
+
+router.post(
+    "/:id/approve",
+    controller.approveCreator
 );
 module.exports = router;

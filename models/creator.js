@@ -24,6 +24,22 @@ module.exports = (sequelize, DataTypes) => {
         allowNull: true,
       },
 
+      is_active: {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: false,
+      },
+
+      approved_by: {
+        type: DataTypes.UUID,
+        allowNull: true,
+      },
+
+      allowed_at: {
+        type: DataTypes.DATE,
+        allowNull: true,
+      },
+
       social_link: {
         type: DataTypes.JSON,
         allowNull: true

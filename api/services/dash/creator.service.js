@@ -83,7 +83,6 @@ module.exports = {
     return await Creator.findAll({ order: [["created_at", "DESC"]] });
   },
 
-
   async getOne(id) {
     const data = await Creator.findByPk(id);
     if (!data) return null;
@@ -128,4 +127,24 @@ module.exports = {
     await creator.destroy();
     return { message: "Creator deleted" };
   },
+
+  async approve(id, adminId) {
+
+    const creator =
+      await Creator.findByPk(id);
+
+    if (!creator)
+      throw new Error("Creator not found");
+
+    await creator.update({
+
+      is_active: true,
+      approved_by: adminId || null,
+      allowed_at: new Date()
+
+    });
+
+    return creator;
+
+  }
 };

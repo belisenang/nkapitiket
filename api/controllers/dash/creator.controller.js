@@ -391,5 +391,21 @@ module.exports = {
 
     });
 
+  },
+
+  async approveCreator(req, res) {
+
+    const creator =
+      await service.approve(
+        req.params.id,
+        req.user?.id
+      );
+
+    res.json({
+      success: true,
+      message: "Creator approved",
+      data: creator
+    });
+
   }
 };
