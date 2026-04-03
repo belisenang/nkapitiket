@@ -4,7 +4,7 @@ const checkoutRoute = require("./checkout.route");
 const paymentRoute = require("./payment.route");
 const customerAuthRoute = require("./customerAuth.route");
 const { cacheMiddleware } = require("../../middlewares/cache.middleware");
-router.get("/home", cacheMiddleware({ ttl: 300 }), controller.homeAll);
+router.get("/home", controller.homeAll);
 router.get("/banner", cacheMiddleware({ ttl: 300 }),  controller.bannerAll);
 router.get("/kategori", cacheMiddleware({ ttl: 300 }), controller.kategoriAll);
 router.get("/kategori/:slug/events", cacheMiddleware({ ttl: 300 }), controller.getEventByKategoriSlug);

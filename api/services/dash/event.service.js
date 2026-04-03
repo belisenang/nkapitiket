@@ -29,7 +29,7 @@ function fillMissingDays(data) {
 
   return result;
 };
-
+ 
 module.exports = {
 
   async getRevenue7Days(eventId) {

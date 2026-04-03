@@ -5,6 +5,9 @@ const {
   CreatorBankAccounts,
   CreatorFinanceSettings
 } = require("../../../models");
+
+const axios = require("axios");
+
 module.exports = {
 
   async getPagination(req, res) {
@@ -158,6 +161,235 @@ module.exports = {
       message: "Finance settings updated",
       data: finance,
     });
-  }
+  },
 
+  async upsertBankAccount(req, res) {
+
+    const {
+
+      bank_code,
+      bank_name,
+      account_number,
+      account_holder_name
+
+    } = req.body;
+
+
+    let bank =
+      await CreatorBankAccounts.findOne({
+
+        where: {
+
+          creator_id:
+            req.params.id
+
+        }
+
+      });
+
+
+    if (!bank) {
+
+      bank =
+        await CreatorBankAccounts.create({
+
+          creator_id:
+            req.params.id,
+
+          bank_code,
+
+          bank_name,
+
+          account_number,
+
+          account_holder_name
+
+        });
+
+    } else {
+
+      await bank.update({
+
+        bank_code,
+
+        bank_name,
+
+        account_number,
+
+        account_holder_name,
+
+        is_verified: false
+
+      });
+
+    }
+
+
+    res.json({
+
+      success: true,
+
+      message:
+        "Bank account saved",
+
+      data: bank
+
+    });
+
+  },
+
+  async verifyBankAccount(req, res) {
+
+    const bank =
+      await CreatorBankAccounts.findOne({
+
+        where: {
+          creator_id: req.params.id
+        }
+
+      });
+
+    if (!bank)
+      throw new Error("Bank not found");
+
+
+    const response =
+      await axios.post(
+
+        "https://api.xendit.co/bank_accounts/validate",
+
+        {
+
+          account_number:
+            bank.account_number,
+
+          bank_code:
+            bank.bank_code
+
+        },
+
+        {
+
+          auth: {
+            username: process.env.XENDIT_SECRET_KEY,
+            password: ""
+          }
+
+        }
+
+      );
+
+
+    if (!response.data.is_valid) {
+
+      throw new Error(
+        "Invalid bank account"
+      );
+
+    }
+
+
+    await bank.update({
+
+      is_verified: true
+
+    });
+
+
+    res.json({
+
+      success: true,
+      message: "verified"
+
+    });
+
+  },
+
+  async upsertDocuments(req, res) {
+
+    let data = {
+
+      creator_id:
+        req.params.id,
+
+      ktp_number:
+        req.body.ktp_number,
+
+      npwp_number:
+        req.body.npwp_number,
+
+      legal_type:
+        req.body.legal_type,
+
+      legal_name:
+        req.body.legal_name
+
+    };
+
+
+    if (req.files?.ktp_image) {
+
+      data.ktp_image =
+        await processImage(
+
+          req.files.ktp_image[0].buffer,
+
+          "documents"
+
+        );
+
+    }
+
+
+    if (req.files?.npwp_image) {
+
+      data.npwp_image =
+        await processImage(
+
+          req.files.npwp_image[0].buffer,
+
+          "documents"
+
+        );
+
+    }
+
+
+    let doc =
+      await CreatorDocuments.findOne({
+
+        where: {
+
+          creator_id:
+            req.params.id
+
+        }
+
+      });
+
+
+    if (!doc) {
+
+      doc =
+        await CreatorDocuments.create(data);
+
+    } else {
+
+      await doc.update(data);
+
+    }
+
+
+    res.json({
+
+      success: true,
+
+      message:
+        "Documents saved",
+
+      data: doc
+
+    });
+
+  }
 };

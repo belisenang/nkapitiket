@@ -15,9 +15,43 @@ router.get("/:id", creatorGuard("PROMOTOR_OWNER"), controller.show);
 router.put("/:id", creatorGuard("PROMOTOR_OWNER"), upload.single("image"), parseFormJson(["social_link"]), validate(schema.update), controller.update);
 router.delete("/:id", controller.destroy);
 
-router.get("/:id/documents", controller.getDocuments);
 router.get("/:id/finance", controller.getFinanceSettings);
 router.post("/:id/finance", controller.updateFinanceSettings);
-router.get("/:id/bank-accounts", controller.getBankAccounts);
 
+router.get(
+    "/:id/bank-accounts",
+    creatorGuard("PROMOTOR_OWNER"),
+    controller.getBankAccounts
+);
+
+router.post(
+    "/:id/bank-accounts",
+    creatorGuard("PROMOTOR_OWNER"),
+    validate(schema.bankAccount),
+    controller.upsertBankAccount
+);
+
+router.post(
+    "/:id/bank-accounts/verify",
+    creatorGuard("PROMOTOR_OWNER"),
+    controller.verifyBankAccount
+);
+
+router.get(
+    "/:id/documents",
+    creatorGuard("PROMOTOR_OWNER"),
+    controller.getDocuments
+);
+
+router.post(
+    "/:id/documents",
+    creatorGuard("PROMOTOR_OWNER"),
+    upload.fields([
+        { name: "ktp_image", maxCount: 1 },
+        { name: "npwp_image", maxCount: 1 },
+        { name: "legal_doc", maxCount: 1 }
+    ]),
+    validate(schema.documents),
+    controller.upsertDocuments
+);
 module.exports = router;

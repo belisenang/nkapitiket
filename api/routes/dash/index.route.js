@@ -15,6 +15,8 @@ const payoutAdminRoute = require("./payoutAdmin.route")
 const imageUploads = require("./imageUpload.route")
 const staffRoute = require("./scan/staff.route")
 const scanRoute = require("./scan/scanner.route")
+const eventApproval = require("./eventApproval.routes")
+const organizerDashboard = require("./organizer.dashboard.routes")
 
 router.use("/users", userRoute);
 router.use("/kategoris", kategoriRoute);
@@ -32,5 +34,7 @@ router.use("/payoutAdmin", payoutAdminRoute);
 router.use("/upload", imageUploads);
 router.use("/staffs", staffRoute);
 router.use("/scanner", scanRoute);
+router.use("/event-approval", eventApproval);
+router.use("/dashboard", organizerDashboard);
 
 module.exports = router;
