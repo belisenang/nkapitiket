@@ -80,21 +80,6 @@ async function startServer() {
 
   });
 
-  app.post("/webhook-dashboard", (req, res) => {
-
-    console.log("webhook dashboard triggered");
-
-    // langsung respon dulu agar github tidak timeout
-    res.status(200).json({
-      success: true,
-      message: "deploy started"
-    });
-
-    // jalankan deploy di background
-    exec("nohup sh /www/wwwroot/deploy-dashboard.sh > /www/wwwroot/deploy-dashboard.log 2>&1 &");
-
-  });
-
   /*
   IMPORTANT
   */
