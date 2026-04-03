@@ -6,7 +6,7 @@ module.exports = function auth(req, res, next) {
   if (!header) return res.status(401).json({ status: false, message: "No token provided" });
 
   const [type, token] = header.split(" ");
-  if (type !== "Bearer" || !token)
+  if (type !== "Bearer" || !token) 
     return res.status(401).json({ status: false, message: "Invalid token format" });
 
   try {

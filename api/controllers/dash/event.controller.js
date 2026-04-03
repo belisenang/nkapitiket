@@ -63,7 +63,7 @@ module.exports = {
       res.status(500).json({ success: false, message: err.message });
     }
   },
-
+ 
   async store(req, res) {
     try {
       const data = { ...req.body };

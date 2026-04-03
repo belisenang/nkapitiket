@@ -3,7 +3,9 @@ const controller = require("../../controllers/fe/fend.controller");
 const checkoutRoute = require("./checkout.route");
 const paymentRoute = require("./payment.route");
 const customerAuthRoute = require("./customerAuth.route");
+const dashboardRoute = require("./dashboard/index.route");
 const { cacheMiddleware } = require("../../middlewares/cache.middleware");
+const jwtkey = require("../../middlewares/fendAuth.middleware");
 router.get("/home", controller.homeAll);
 router.get("/banner", cacheMiddleware({ ttl: 300 }),  controller.bannerAll);
 router.get("/kategori", cacheMiddleware({ ttl: 300 }), controller.kategoriAll);
@@ -18,5 +20,6 @@ router.use("/payment", paymentRoute);
 
 router.use("/auth/customer", customerAuthRoute);
 // dashboard route
-router.use("/dashboard", controller.dashboard);
+router.use("/dashboard", jwtkey, dashboardRoute);
+
 module.exports = router;
