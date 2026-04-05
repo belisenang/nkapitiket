@@ -138,7 +138,30 @@ module.exports = {
                 error: err.message
             });
         }
-    }
+    },
+
+    async checkStockTicket(req, res) {
+        try {
+
+            const result =
+                await service.checkStockTicket(req.body);
+
+            res.json({
+                success: true,
+                message: "Stock valid",
+                data: result
+            });
+
+        } catch (err) {
+
+            res.status(400).json({
+                success: false,
+                message: err.message
+            });
+
+        }
+    },
+
 
 
 }; 

@@ -733,6 +733,343 @@ module.exports = {
 
     }
 
+  },
+
+  async calculateTax(payload) {
+
+    const { items } = payload;
+
+    if (!items?.length)
+      throw new Error("Items required");
+
+    /* =========================
+       SYSTEM TAX
+    ========================= */
+
+    const systemFinance =
+      await SystemFinanceSettings.findOne();
+
+    const TAX_RATE =
+      Number(systemFinance.tax_rate) / 100;
+
+    /* =========================
+       LOAD TICKETS
+    ========================= */
+
+    const ticketIds =
+      items
+        .filter(i => i.type === "ticket")
+        .map(i => i.ticket_type_id);
+
+    const tickets =
+      await TicketType.findAll({
+
+        where: { id: ticketIds },
+
+        include: [
+          {
+            model: Event,
+            as: "event",
+            attributes: ["creator_id"]
+          }
+        ]
+
+      });
+
+    const ticketMap = {};
+
+    tickets.forEach(
+      t => ticketMap[t.id] = t
+    );
+
+    /* =========================
+       LOAD BUNDLES
+    ========================= */
+
+    const bundleIds =
+      items
+        .filter(i => i.type === "bundle")
+        .map(i => i.bundle_id);
+
+    const bundles =
+      await TicketBundles.findAll({
+
+        where: { id: bundleIds },
+
+        include: [
+          {
+            model: TicketBundleItem,
+            as: "items"
+          }
+        ]
+
+      });
+
+    const bundleMap = {};
+
+    bundles.forEach(
+      b => bundleMap[b.id] = b
+    );
+
+    /* =========================
+       GLOBAL
+    ========================= */
+
+    let creatorId = null;
+
+    let ticketSubtotal = 0;
+
+    let totalAdminFee = 0;
+
+    let totalTax = 0;
+
+    let buyerPayTotal = 0;
+
+    let organizerNetTotal = 0;
+
+    let adminFeeBearer = null;
+
+    let taxBearer = null;
+
+    /* =========================
+       PROCESS ITEMS
+    ========================= */
+
+    for (const item of items) {
+
+      /* ================= TICKET ================= */
+
+      if (item.type === "ticket") {
+
+        const t =
+          ticketMap[item.ticket_type_id];
+
+        if (!t)
+          throw new Error("Ticket not found");
+
+        const creatorFinance =
+          await CreatorFinanceSettings.findOne({
+
+            where: {
+              creator_id: t.event.creator_id
+            }
+
+          });
+
+        creatorId =
+          t.event.creator_id;
+
+        const price =
+          Number(t.price);
+
+        const qty =
+          item.quantity;
+
+        const subtotal =
+          price * qty;
+
+        /* admin fee */
+
+        let adminFeeSingle = 0;
+
+        if (creatorFinance.admin_fee_type === "flat")
+
+          adminFeeSingle =
+            Number(
+              creatorFinance.admin_fee_value
+            );
+
+        else
+
+          adminFeeSingle =
+            price *
+            (
+              Number(
+                creatorFinance.admin_fee_value
+              ) / 100
+            );
+
+        const adminFeeTotal =
+          adminFeeSingle * qty;
+
+        /* tax */
+
+        const taxTotal =
+          price *
+          TAX_RATE *
+          qty;
+
+        /* bearer */
+
+        const buyerPaysAdmin =
+          t.admin_fee_included == 1;
+
+        const buyerPaysTax =
+          t.tax_included == 1;
+
+        adminFeeBearer =
+          resolveBearer(
+            adminFeeBearer,
+            buyerPaysAdmin
+          );
+
+        taxBearer =
+          resolveBearer(
+            taxBearer,
+            buyerPaysTax
+          );
+
+        /* total */
+
+        let buyerTotal =
+          subtotal;
+
+        let organizerNet =
+          subtotal;
+
+        if (buyerPaysAdmin)
+
+          buyerTotal +=
+            adminFeeTotal;
+
+        else
+
+          organizerNet -=
+            adminFeeTotal;
+
+        if (buyerPaysTax)
+
+          buyerTotal +=
+            taxTotal;
+
+        else
+
+          organizerNet -=
+            taxTotal;
+
+        ticketSubtotal +=
+          subtotal;
+
+        totalAdminFee +=
+          adminFeeTotal;
+
+        totalTax +=
+          taxTotal;
+
+        buyerPayTotal +=
+          buyerTotal;
+
+        organizerNetTotal +=
+          organizerNet;
+
+      }
+
+      /* ================= BUNDLE ================= */
+
+      if (item.type === "bundle") {
+
+        const bundle =
+          bundleMap[item.bundle_id];
+
+        if (!bundle)
+          throw new Error("Bundle not found");
+
+        const creatorFinance =
+          await CreatorFinanceSettings.findOne({
+
+            where: {
+              creator_id: creatorId
+            }
+
+          });
+
+        const subtotal =
+          Number(bundle.price) *
+          item.quantity;
+
+        let bundleAdminFee = 0;
+
+        let bundleTax = 0;
+
+        for (const bItem of bundle.items) {
+
+          const ticket =
+            ticketMap[
+            bItem.ticket_type_id
+            ];
+
+          const unitPrice =
+            Number(ticket.price);
+
+          const qty =
+            bItem.quantity *
+            item.quantity;
+
+          let adminFeeSingle = 0;
+
+          if (creatorFinance.admin_fee_type === "flat")
+
+            adminFeeSingle =
+              Number(
+                creatorFinance.admin_fee_value
+              );
+
+          else
+
+            adminFeeSingle =
+              unitPrice *
+              (
+                Number(
+                  creatorFinance.admin_fee_value
+                ) / 100
+              );
+
+          bundleAdminFee +=
+            adminFeeSingle * qty;
+
+          bundleTax +=
+            unitPrice *
+            TAX_RATE *
+            qty;
+
+        }
+
+        const buyerBundleTotal =
+          subtotal +
+          bundleAdminFee +
+          bundleTax;
+
+        ticketSubtotal +=
+          subtotal;
+
+        totalAdminFee +=
+          bundleAdminFee;
+
+        totalTax +=
+          bundleTax;
+
+        buyerPayTotal +=
+          buyerBundleTotal;
+
+        organizerNetTotal +=
+          subtotal;
+
+      }
+
+    }
+
+    return {
+
+      total: ticketSubtotal,
+
+      tax: totalTax,
+
+      adminFee: totalAdminFee,
+
+      grandTotal: buyerPayTotal
+
+    };
+
   }
 
 };

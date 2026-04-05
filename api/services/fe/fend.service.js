@@ -1,4 +1,4 @@
-const { Kategori, Banner, Event, Creator, TicketType, GuestStars, Sponsors, Fasilitas, TicketGroup, TicketBundles, TicketBundleItem } = require("../../../models");
+const { Kategori, Banner, Event, Creator, TicketType, GuestStars, Sponsors, Fasilitas, TicketGroup, TicketBundles, TicketBundleItem, SystemFinanceSettings, CreatorFinanceSettings } = require("../../../models");
 const { Op, Sequelize } = require("sequelize");
 const { mapEvent } = require("../../utils/event.mapper");
 const { buildPagination } = require("../../utils/pagination");
@@ -755,7 +755,166 @@ module.exports = {
             totalSold: event.ticket_types.reduce((sum, t) => sum + (t.ticket_sold || 0), 0)
         }));
         return data;
-    }
+    },
+
+    async checkStockTicket(payload) {
+
+        const { items } = payload;
+
+        if (!items?.length)
+            throw new Error("Items required");
+
+        /* ambil semua id */
+
+        const ticketIds =
+            items
+                .filter(i => i.type === "ticket")
+                .map(i => i.ticket_type_id);
+
+        const bundleIds =
+            items
+                .filter(i => i.type === "bundle")
+                .map(i => i.bundle_id);
+
+        /* query paralel */
+
+        const [tickets, bundles] =
+            await Promise.all([
+
+                TicketType.findAll({
+
+                    where: {
+                        id: ticketIds
+                    },
+
+                    attributes: [
+                        "id",
+                        "name",
+                        "total_stock",
+                        "ticket_sold",
+                        "reserved_stock",
+                        "max_per_order",
+                        "sale_start",
+                        "sale_end"
+                    ]
+
+                }),
+
+                TicketBundles.findAll({
+
+                    where: {
+                        id: bundleIds
+                    },
+
+                    attributes: [
+                        "id",
+                        "name",
+                        "total_stock",
+                        "sold",
+                        "reserved_stock",
+                        "max_per_order",
+                        "sale_start",
+                        "sale_end"
+                    ]
+
+                })
+
+            ]);
+
+        const now = new Date();
+
+        const result = [];
+
+        /* validate ticket */
+
+        for (const item of items) {
+
+            if (item.type === "ticket") {
+
+                const t =
+                    tickets.find(
+                        x => x.id === item.ticket_type_id
+                    );
+
+                if (!t)
+                    throw new Error("Ticket not found");
+
+                const stock =
+                    t.total_stock
+                    - t.ticket_sold
+                    - t.reserved_stock;
+
+                if (now < new Date(t.sale_start))
+                    throw new Error(`${t.name} belum dijual`);
+
+                if (now > new Date(t.sale_end))
+                    throw new Error(`${t.name} sudah berakhir`);
+
+                if (item.quantity > stock)
+                    throw new Error(`${t.name} sisa ${stock}`);
+
+                if (
+                    t.max_per_order &&
+                    item.quantity > t.max_per_order
+                )
+                    throw new Error(
+                        `Max ${t.max_per_order}`
+                    );
+
+                result.push({
+
+                    type: "ticket",
+
+                    id: t.id,
+
+                    available_stock: stock,
+
+                    requested_qty: item.quantity
+
+                });
+
+            }
+
+            /* bundle */
+
+            if (item.type === "bundle") {
+
+                const b =
+                    bundles.find(
+                        x => x.id === item.bundle_id
+                    );
+
+                if (!b)
+                    throw new Error("Bundle not found");
+
+                const stock =
+                    b.total_stock
+                    - b.sold
+                    - b.reserved_stock;
+
+                if (item.quantity > stock)
+                    throw new Error(`${b.name} sisa ${stock}`);
+
+                result.push({
+
+                    type: "bundle",
+
+                    id: b.id,
+
+                    available_stock: stock,
+
+                    requested_qty: item.quantity
+
+                });
+
+            }
+
+        }
+
+        return result;
+
+    },
+
 };
 
 

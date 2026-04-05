@@ -25,7 +25,7 @@ module.exports = {
 
   // Ambil data pajak saat ini
   async getTaxRate() {
-    return await SystemFinanceSettings.findOne(); // Mengambil 1 record karena hanya ada satu pengaturan
+    return await SystemFinanceSettings.findOne();
   },
 
   async getAdminFee(creator_id) {

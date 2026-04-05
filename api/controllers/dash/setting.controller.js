@@ -5,7 +5,8 @@ const settingsService = require("../../services/dash/setting.service");
 module.exports = {
   async getSettings(req, res) {
     try {
-      const creator_id = req.user.creator_id;
+      // const creator_id = req.user.creator_id;
+      const creator_id = "176c5287-6b45-4f0f-801a-193c2d49afac";
       const settings = await settingsService.getSettings(creator_id);
       res.json({ success: true, data: settings });
     } catch (err) {

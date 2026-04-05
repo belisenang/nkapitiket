@@ -6,6 +6,9 @@ const customerAuthRoute = require("./customerAuth.route");
 const dashboardRoute = require("./dashboard/index.route");
 const { cacheMiddleware } = require("../../middlewares/cache.middleware");
 const jwtkey = require("../../middlewares/fendAuth.middleware");
+const controllerS = require("../../controllers/dash/setting.controller");
+
+router.get("/setting", controllerS.getSettings); 
 router.get("/home", controller.homeAll);
 router.get("/banner", cacheMiddleware({ ttl: 300 }),  controller.bannerAll);
 router.get("/kategori", cacheMiddleware({ ttl: 300 }), controller.kategoriAll);
@@ -14,6 +17,7 @@ router.get("/event", cacheMiddleware({ ttl: 300 }), controller.eventAll);
 router.get("/events", cacheMiddleware({ ttl: 300 }), controller.searchEvents);
 router.get("/event/:slug", cacheMiddleware({ ttl: 300 }), controller.getOneEvent);
 router.get("/event/tickets/:slug", controller.getTicketEvent);
+router.post("/event/ticket/checkstock", cacheMiddleware({ ttl: 5 }), controller.checkStockTicket);
 
 router.use("/checkout", checkoutRoute);
 router.use("/payment", paymentRoute);
